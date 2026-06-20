@@ -66,9 +66,11 @@ export default function AdminPage() {
   }, [profile, loading, router]);
 
   useEffect(() => {
-    if (!user || !profile?.is_admin) return;
+    if (loading) return;
+    if (!user || !profile) return;
+    if (!profile.is_admin) { setPageLoading(false); return; }
     loadRounds();
-  }, [user, profile]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, profile, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadRounds() {
     const { data } = await supabase

@@ -56,19 +56,10 @@ export default function AdminPage() {
   const [finalizeMsg, setFinalizeMsg] = useState("");
 
   useEffect(() => {
-    if (!loading && !user) router.replace("/login");
-  }, [user, loading, router]);
-
-  useEffect(() => {
-    if (!loading && profile && !profile.is_admin) {
-      router.replace("/game");
-    }
-  }, [profile, loading, router]);
-
-  useEffect(() => {
     if (loading) return;
-    if (!user || !profile) return;
-    if (!profile.is_admin) { setPageLoading(false); return; }
+    if (!user) { router.replace("/login"); return; }
+    if (!profile) { setPageLoading(false); return; }
+    if (!profile.is_admin) { router.replace("/game"); return; }
     loadRounds();
   }, [user, profile, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -204,7 +195,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!profile?.is_admin) return null;
+  if (!user || !profile?.is_admin) return null;
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">

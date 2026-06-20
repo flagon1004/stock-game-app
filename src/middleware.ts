@@ -27,7 +27,7 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthPage = pathname === "/login" || pathname === "/register";
-  const isProtected = pathname.startsWith("/game") || pathname.startsWith("/mypage");
+  const isProtected = pathname.startsWith("/game") || pathname.startsWith("/mypage") || pathname.startsWith("/admin");
 
   if (!user && isProtected) {
     return NextResponse.redirect(new URL("/login", request.url));
@@ -41,5 +41,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/register", "/game", "/mypage"],
+  matcher: ["/", "/login", "/register", "/game", "/mypage", "/admin"],
 };

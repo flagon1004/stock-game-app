@@ -10,6 +10,7 @@ interface Stock {
   stock_code: string;
   stock_name: string;
   sort_order: number;
+  analysis_url: string | null;
 }
 
 interface Round {
@@ -93,7 +94,7 @@ export default function GamePage() {
 
       const { data: stockData } = await supabase
         .from("round_stocks")
-        .select("stock_code, stock_name, sort_order")
+        .select("stock_code, stock_name, sort_order, analysis_url")
         .eq("round_id", roundData.id)
         .order("sort_order");
 
@@ -239,8 +240,21 @@ export default function GamePage() {
                     } ${submittedCode && !isSubmitted ? "opacity-60" : ""}`}
                   >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-gray-900">{stock.stock_name}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-900">{stock.stock_name}</p>
+                          {stock.analysis_url && (
+                            <a
+                              href={stock.analysis_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full hover:bg-blue-200 transition-colors"
+                            >
+                              분석 보기
+                            </a>
+                          )}
+                        </div>
                         <p className="text-xs text-gray-400 mt-0.5">{stock.stock_code}</p>
                       </div>
                       <div

@@ -26,6 +26,7 @@ interface PickCount {
 const EMPTY_STOCKS = Array.from({ length: 5 }, (_, i) => ({
   stock_code: "",
   stock_name: "",
+  analysis_url: "",
   sort_order: i + 1,
 }));
 
@@ -97,6 +98,7 @@ export default function AdminPage() {
         stock_code: s.stock_code.trim(),
         stock_name: s.stock_name.trim(),
         sort_order: s.sort_order,
+        analysis_url: s.analysis_url.trim() || null,
       }))
     );
 
@@ -318,6 +320,17 @@ export default function AdminPage() {
                         setNewStocks(updated);
                       }}
                       className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="url"
+                      placeholder="분석 URL (선택)"
+                      value={stock.analysis_url}
+                      onChange={(e) => {
+                        const updated = [...newStocks];
+                        updated[idx] = { ...updated[idx], analysis_url: e.target.value };
+                        setNewStocks(updated);
+                      }}
+                      className="w-36 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 ))}

@@ -40,12 +40,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function loadProfile(u: SupabaseUser) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("id, nickname, points, is_admin")
       .eq("id", u.id)
       .single();
-    setProfile(data ?? null);
+    if (error) console.error("loadProfile error:", error);
+    setProfile(data ? { ...data, is_admin: data.is_admin ?? false } : null);
   }
 
   async function refreshProfile() {

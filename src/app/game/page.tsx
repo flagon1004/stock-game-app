@@ -19,6 +19,42 @@ interface Round {
   is_finalized: boolean;
 }
 
+/** 현재 투표 가능 시간인지 확인 (KST 기준: 금 17:00 ~ 월 07:00) */
+function isVotingOpen(): boolean {
+  const now = new Date();
+  // KST = UTC+9
+  const kstOffset = 9 * 60;
+  const kstMs = now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60 * 1000;
+  const kst = new Date(kstMs);
+  const day = kst.getDay(); // 0=일, 1=월, 2=화 ... 5=금, 6=토
+  const hour = kst.getHours();
+  const minute = kst.getMinutes();
+  const timeVal = hour * 100 + minute; // HHMM
+
+  // 금요일(5) 17:00 이후
+  if (day === 5 && timeVal >= 1700) return true;
+  // 토요일(6) 전체
+  if (day === 6) return true;
+  // 일요일(0) 전체
+  if (day === 0) return true;
+  // 월요일(1) 07:00 이전
+  if (day === 1 && timeVal < 700) return true;
+  return false;
+}
+
+function getVotingStatusMessage(): string {
+  const now = new Date();
+  const kstOffset = 9 * 60;
+  const kstMs = now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60 * 1000;
+  const kst = new Date(kstMs);
+  const day = kst.getDay();
+
+  if (day === 1) return "월요일 오전 7시에 투표가 마감되었습니다.";
+  if (day >= 2 && day <= 4) return "투표는 금요일 오후 5시에 시작됩니다.";
+  if (day === 5) return "투표는 오늘(금) 오후 5시에 시작됩니다.";
+  return "현재 투표 기간이 아닙니다.";
+}
+
 export default function GamePage() {
   const { user, profile, loading, logout } = useAuth();
   const router = useRouter();
@@ -28,9 +64,11 @@ export default function GamePage() {
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [submittedCode, setSubmittedCode] = useState<string | null>(null);
+  const [pickCounts, setPickCounts] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [pageLoading, setPageLoading] = useState(true);
+  const [votingOpen] = useState(isVotingOpen());
 
   useEffect(() => {
     if (!loading && !user) {
@@ -42,7 +80,6 @@ export default function GamePage() {
     if (!user) return;
 
     async function load() {
-      // 최신 미확정 라운드 조회
       const { data: roundData } = await supabase
         .from("weekly_rounds")
         .select("id, start_date, end_date, is_finalized")
@@ -54,7 +91,6 @@ export default function GamePage() {
       if (!roundData) { setPageLoading(false); return; }
       setRound(roundData);
 
-      // 종목 조회
       const { data: stockData } = await supabase
         .from("round_stocks")
         .select("stock_code, stock_name, sort_order")
@@ -63,7 +99,6 @@ export default function GamePage() {
 
       setStocks(stockData ?? []);
 
-      // 이미 제출한 픽 확인
       const { data: pickData } = await supabase
         .from("picks")
         .select("stock_code")
@@ -74,6 +109,8 @@ export default function GamePage() {
       if (pickData) {
         setSubmittedCode(pickData.stock_code);
         setSelected(pickData.stock_code);
+        // 이미 픽한 경우 통계 로드
+        await loadPickCounts(roundData.id);
       }
 
       setPageLoading(false);
@@ -81,6 +118,17 @@ export default function GamePage() {
 
     load();
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadPickCounts(roundId: string) {
+    const { data } = await supabase.rpc("get_pick_counts", { p_round_id: roundId });
+    if (data) {
+      const counts: Record<string, number> = {};
+      (data as { stock_code: string; cnt: number }[]).forEach((row) => {
+        counts[row.stock_code] = Number(row.cnt);
+      });
+      setPickCounts(counts);
+    }
+  }
 
   if (loading || pageLoading) {
     return (
@@ -111,10 +159,13 @@ export default function GamePage() {
       );
     } else {
       setSubmittedCode(selected);
+      await loadPickCounts(round.id);
     }
 
     setSubmitting(false);
   }
+
+  const totalPicks = Object.values(pickCounts).reduce((s, c) => s + c, 0);
 
   const endDate = round ? new Date(round.end_date) : null;
   const endDateStr = endDate
@@ -154,6 +205,15 @@ export default function GamePage() {
               <p className="text-xs text-blue-500 mt-0.5">1위 +100pt · 2위 +50pt</p>
             </div>
 
+            {/* 투표 마감 안내 */}
+            {!votingOpen && !submittedCode && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-center">
+                <p className="text-sm font-medium text-amber-700">⏰ 현재 투표 시간이 아닙니다</p>
+                <p className="text-xs text-amber-600 mt-0.5">{getVotingStatusMessage()}</p>
+                <p className="text-xs text-amber-500 mt-0.5">투표 가능 시간: 금요일 17:00 ~ 월요일 07:00</p>
+              </div>
+            )}
+
             {error && (
               <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
             )}
@@ -162,17 +222,21 @@ export default function GamePage() {
               {stocks.map((stock) => {
                 const isSelected = selected === stock.stock_code;
                 const isSubmitted = submittedCode === stock.stock_code;
+                const count = pickCounts[stock.stock_code] ?? 0;
+                const pct = totalPicks > 0 ? Math.round((count / totalPicks) * 100) : 0;
 
                 return (
                   <button
                     key={stock.stock_code}
-                    onClick={() => { if (!submittedCode) setSelected(stock.stock_code); }}
-                    disabled={!!submittedCode}
+                    onClick={() => {
+                      if (!submittedCode && votingOpen) setSelected(stock.stock_code);
+                    }}
+                    disabled={!!submittedCode || !votingOpen}
                     className={`w-full text-left rounded-xl border-2 px-4 py-4 transition-all ${
                       isSelected
                         ? "border-blue-600 bg-blue-50"
                         : "border-gray-100 bg-white hover:border-gray-300"
-                    } ${submittedCode && !isSubmitted ? "opacity-50" : ""}`}
+                    } ${submittedCode && !isSubmitted ? "opacity-60" : ""}`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -191,6 +255,24 @@ export default function GamePage() {
                         )}
                       </div>
                     </div>
+
+                    {/* 픽 제출 후 통계 Bar */}
+                    {submittedCode && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                          <span>{count}명</span>
+                          <span>{pct}%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all duration-500 ${
+                              isSubmitted ? "bg-blue-500" : "bg-gray-300"
+                            }`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -199,7 +281,7 @@ export default function GamePage() {
             {!submittedCode ? (
               <button
                 onClick={handleSubmit}
-                disabled={!selected || submitting}
+                disabled={!selected || submitting || !votingOpen}
                 className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold rounded-xl py-3 transition-colors"
               >
                 {submitting ? "제출 중..." : "선택 완료"}

@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
+const FIXED_PASSWORD = "stockgame#2026!";
+
 export default function RegisterPage() {
   const supabase = createClient();
   const router = useRouter();
 
   const [nickname, setNickname] = useState("");
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -21,11 +22,9 @@ export default function RegisterPage() {
 
     if (nickname.trim().length < 2) { setError("닉네임은 2자 이상이어야 합니다."); return; }
     if (username.trim().length < 4)  { setError("아이디는 4자 이상이어야 합니다."); return; }
-    if (password.length < 6)         { setError("비밀번호는 6자 이상이어야 합니다."); return; }
 
     setLoading(true);
 
-    // 닉네임 중복 확인
     const { count } = await supabase
       .from("profiles")
       .select("id", { count: "exact", head: true })
@@ -37,11 +36,10 @@ export default function RegisterPage() {
       return;
     }
 
-    // Supabase Auth 가입 (username을 email 형식으로 변환)
     const fakeEmail = `${username.trim()}@stockgame.local`;
     const { error: signUpError } = await supabase.auth.signUp({
       email: fakeEmail,
-      password,
+      password: FIXED_PASSWORD,
       options: {
         data: { nickname: nickname.trim() },
       },
@@ -99,19 +97,6 @@ export default function RegisterPage() {
               onChange={(e) => setUsername(e.target.value)}
               placeholder="4자 이상 (영문/숫자)"
               autoComplete="username"
-              required
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">비밀번호</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="6자 이상"
-              autoComplete="new-password"
               required
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />

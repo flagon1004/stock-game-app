@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
+const FIXED_PASSWORD = "stockgame#2026!";
+
 export default function LoginPage() {
   const supabase = createClient();
   const router = useRouter();
 
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -22,11 +23,11 @@ export default function LoginPage() {
     const fakeEmail = `${username.trim()}@stockgame.local`;
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: fakeEmail,
-      password,
+      password: FIXED_PASSWORD,
     });
 
     if (signInError) {
-      setError("아이디 또는 비밀번호가 올바르지 않습니다.");
+      setError("아이디를 확인해주세요.");
       setLoading(false);
       return;
     }
@@ -39,7 +40,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-blue-800">📈 주식 픽 게임</h1>
-          <p className="text-gray-500 text-sm mt-1">이번 주 1위 종목을 맞혀보세요</p>
+          <p className="text-gray-500 text-sm mt-1">다음 주 1위 종목을 맞혀보세요</p>
         </div>
 
         <form
@@ -59,18 +60,6 @@ export default function LoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
-              required
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">비밀번호</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
               required
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />

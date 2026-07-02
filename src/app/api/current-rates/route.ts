@@ -7,6 +7,10 @@ export async function GET() {
     return NextResponse.json({ rates });
   } catch (error) {
     console.error("현재 등락률 조회 실패:", error);
-    return NextResponse.json({ rates: {} }, { status: 500 });
+    // TODO: 원인 확인 후 error 필드 제거
+    return NextResponse.json(
+      { rates: {}, error: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
   }
 }

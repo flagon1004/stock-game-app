@@ -22,7 +22,8 @@ export async function fetchCurrentRates(): Promise<Record<string, number>> {
 
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
-    throw new Error(`구글시트 조회 실패: ${res.status}`);
+    const body = await res.text();
+    throw new Error(`구글시트 조회 실패: ${res.status} ${body}`);
   }
 
   const data = (await res.json()) as { values?: string[][] };

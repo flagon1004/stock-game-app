@@ -18,6 +18,18 @@ interface RoundResult {
   stocks: { stock_code: string; stock_name: string; sort_order: number }[];
 }
 
+interface CurrentRound {
+  id: string;
+  start_date: string;
+  end_date: string;
+}
+
+interface CurrentStock {
+  stock_code: string;
+  stock_name: string;
+  sort_order: number;
+}
+
 function calcPoints(myCode: string | null, rank1: string | null, rank2: string | null): number {
   if (!myCode) return 0;
   if (myCode === rank1) return 100;
@@ -31,6 +43,9 @@ export default function MyPage() {
   const supabase = createClient();
 
   const [rounds, setRounds] = useState<RoundResult[]>([]);
+  const [currentRound, setCurrentRound] = useState<CurrentRound | null>(null);
+  const [currentStocks, setCurrentStocks] = useState<CurrentStock[]>([]);
+  const [currentRates, setCurrentRates] = useState<Record<string, number>>({});
   const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
@@ -40,13 +55,45 @@ export default function MyPage() {
   useEffect(() => {
     if (!user) return;
 
-    async function load() {
-      // 확정된 라운드만 조회 (RLS가 미확정 results를 차단하므로 안전)
-      const { data: finalizedRounds } = await supabase
+    async function loadCurrentRound() {
+      const { data: roundData } = await supabase
         .from("weekly_rounds")
         .select("id, start_date, end_date")
-        .eq("is_finalized", true)
-        .order("start_date", { ascending: false });
+        .eq("is_finalized", false)
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!roundData) return;
+      setCurrentRound(roundData);
+
+      const { data: stockData } = await supabase
+        .from("round_stocks")
+        .select("stock_code, stock_name, sort_order")
+        .eq("round_id", roundData.id)
+        .order("sort_order");
+      setCurrentStocks(stockData ?? []);
+
+      try {
+        const res = await fetch("/api/current-rates");
+        const json = await res.json();
+        setCurrentRates(json.rates ?? {});
+      } catch {
+        setCurrentRates({});
+      }
+    }
+
+    async function load() {
+      // 확정된 라운드 중 가장 최근 1주만 조회 (RLS가 미확정 results를 차단하므로 안전)
+      const [{ data: finalizedRounds }] = await Promise.all([
+        supabase
+          .from("weekly_rounds")
+          .select("id, start_date, end_date")
+          .eq("is_finalized", true)
+          .order("start_date", { ascending: false })
+          .limit(1),
+        loadCurrentRound(),
+      ]);
 
       if (!finalizedRounds || finalizedRounds.length === 0) {
         setPageLoading(false);
@@ -129,6 +176,51 @@ export default function MyPage() {
           <p className="text-3xl font-bold mt-1">{profile.points.toLocaleString()} pt</p>
           <p className="text-xs opacity-60 mt-1">누적 포인트</p>
         </div>
+
+        {/* 현재 라운드 진행 */}
+        <section>
+          <h2 className="text-sm font-semibold text-gray-500 mb-3">현재 라운드 진행</h2>
+
+          {!currentRound ? (
+            <p className="text-sm text-gray-400 text-center py-6">진행 중인 라운드가 없습니다.</p>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-50">
+                <p className="text-sm font-medium text-gray-700">
+                  {currentRound.start_date} ~ {currentRound.end_date}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">전일 종가 기준의 현재 등락률</p>
+              </div>
+
+              <div className="px-4 py-3 space-y-2">
+                {currentStocks.map((stock, idx) => {
+                  const rate = currentRates[stock.stock_code];
+                  const hasRate = rate !== undefined;
+
+                  return (
+                    <div key={stock.stock_code} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold w-4 text-gray-400">{idx + 1}</span>
+                        <span className="font-medium text-gray-800">{stock.stock_name}</span>
+                      </div>
+                      <span
+                        className={
+                          !hasRate
+                            ? "text-gray-300"
+                            : rate >= 0
+                            ? "text-red-500 font-medium"
+                            : "text-blue-500 font-medium"
+                        }
+                      >
+                        {hasRate ? `${rate >= 0 ? "+" : ""}${rate.toFixed(1)}%` : "-"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* 지난 라운드 결과 */}
         <section>

@@ -1,5 +1,20 @@
 const SHEET_RANGE = "'게임종목'!B5:P9";
 
+/** 다음 KST 16:15까지 남은 초(최소 60초) — 캐시 TTL 계산용 */
+function secondsUntilNextUpdate(): number {
+  const now = new Date();
+  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+
+  const target = new Date(kstNow);
+  target.setUTCHours(7, 15, 0, 0); // KST 16:15 = UTC 07:15
+  if (kstNow.getUTCHours() * 60 + kstNow.getUTCMinutes() >= 7 * 60 + 15) {
+    target.setUTCDate(target.getUTCDate() + 1);
+  }
+
+  const diff = Math.floor((target.getTime() - now.getTime()) / 1000);
+  return Math.max(diff, 60);
+}
+
 function parseRate(raw: string): number | null {
   const cleaned = raw.replace(/[%,+\s]/g, "");
   if (cleaned === "") return null;
@@ -20,7 +35,7 @@ export async function fetchCurrentRates(): Promise<Record<string, number>> {
     SHEET_RANGE
   )}?key=${apiKey}`;
 
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, { next: { revalidate: secondsUntilNextUpdate() } });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`구글시트 조회 실패: ${res.status} ${body}`);

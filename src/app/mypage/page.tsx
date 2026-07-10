@@ -30,6 +30,13 @@ interface CurrentStock {
   sort_order: number;
 }
 
+interface PlayerScore {
+  user_id: string;
+  nickname: string;
+  points: number;
+  lastWeekPoints: number;
+}
+
 function calcPoints(myCode: string | null, rank1: string | null, rank2: string | null): number {
   if (!myCode) return 0;
   if (myCode === rank1) return 100;
@@ -46,6 +53,7 @@ export default function MyPage() {
   const [currentRound, setCurrentRound] = useState<CurrentRound | null>(null);
   const [currentStocks, setCurrentStocks] = useState<CurrentStock[]>([]);
   const [currentRates, setCurrentRates] = useState<Record<string, number>>({});
+  const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
@@ -83,17 +91,68 @@ export default function MyPage() {
       }
     }
 
+    async function loadPlayerScores() {
+      // 전체 회원 누적 점수
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, nickname, points")
+        .order("points", { ascending: false });
+
+      if (!profiles) return;
+
+      // 가장 최근 확정 라운드
+      const { data: lastRound } = await supabase
+        .from("weekly_rounds")
+        .select("id")
+        .eq("is_finalized", true)
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let lastWeekMap: Record<string, number> = {};
+
+      if (lastRound) {
+        const { data: lastResult } = await supabase
+          .from("results")
+          .select("rank1_stock, rank2_stock")
+          .eq("round_id", lastRound.id)
+          .maybeSingle();
+
+        const { data: lastPicks } = await supabase
+          .from("picks")
+          .select("user_id, stock_code")
+          .eq("round_id", lastRound.id);
+
+        if (lastResult && lastPicks) {
+          for (const pick of lastPicks) {
+            lastWeekMap[pick.user_id] = calcPoints(
+              pick.stock_code,
+              lastResult.rank1_stock,
+              lastResult.rank2_stock
+            );
+          }
+        }
+      }
+
+      setPlayerScores(
+        profiles.map((p) => ({
+          user_id: p.id,
+          nickname: p.nickname,
+          points: p.points,
+          lastWeekPoints: lastWeekMap[p.id] ?? 0,
+        }))
+      );
+    }
+
     async function load() {
-      // 확정된 라운드 중 가장 최근 1주만 조회 (RLS가 미확정 results를 차단하므로 안전)
-      const [{ data: finalizedRounds }] = await Promise.all([
-        supabase
-          .from("weekly_rounds")
-          .select("id, start_date, end_date")
-          .eq("is_finalized", true)
-          .order("start_date", { ascending: false })
-          .limit(1),
-        loadCurrentRound(),
-      ]);
+      const { data: finalizedRounds } = await supabase
+        .from("weekly_rounds")
+        .select("id, start_date, end_date")
+        .eq("is_finalized", true)
+        .order("start_date", { ascending: false })
+        .limit(1);
+
+      await Promise.all([loadCurrentRound(), loadPlayerScores()]);
 
       if (!finalizedRounds || finalizedRounds.length === 0) {
         setPageLoading(false);
@@ -102,7 +161,6 @@ export default function MyPage() {
 
       const roundIds = finalizedRounds.map((r) => r.id);
 
-      // 내 픽, 결과, 종목 병렬 조회
       const [{ data: myPicks }, { data: results }, { data: allStocks }] = await Promise.all([
         supabase
           .from("picks")
@@ -155,6 +213,11 @@ export default function MyPage() {
   }
 
   if (!user || !profile) return null;
+
+  const myRank = playerScores.findIndex((p) => p.user_id === user.id) + 1;
+  const topFive = playerScores.slice(0, 5);
+  const myScore = playerScores.find((p) => p.user_id === user.id);
+  const myInTopFive = myRank > 0 && myRank <= 5;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -218,6 +281,74 @@ export default function MyPage() {
                   );
                 })}
               </div>
+            </div>
+          )}
+        </section>
+
+        {/* Player Score */}
+        <section>
+          <h2 className="text-sm font-semibold text-gray-500 mb-3">Player Score</h2>
+
+          {playerScores.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">참여자가 없습니다.</p>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              {/* 헤더 */}
+              <div className="px-4 py-2 border-b border-gray-50 flex items-center text-xs text-gray-400 font-medium">
+                <span className="w-6">순위</span>
+                <span className="flex-1 pl-2">닉네임</span>
+                <span className="w-16 text-right">지난주</span>
+                <span className="w-16 text-right">누적</span>
+              </div>
+
+              {/* 상위 5명 */}
+              {topFive.map((p, idx) => {
+                const isMe = p.user_id === user.id;
+                const rankEmoji = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`;
+
+                return (
+                  <div
+                    key={p.user_id}
+                    className={`px-4 py-2.5 flex items-center text-sm border-b border-gray-50 last:border-0 ${
+                      isMe ? "bg-blue-50" : ""
+                    }`}
+                  >
+                    <span className="w-6 text-center text-sm">{rankEmoji}</span>
+                    <span className={`flex-1 pl-2 font-medium ${isMe ? "text-blue-700" : "text-gray-800"}`}>
+                      {p.nickname}
+                      {isMe && <span className="ml-1 text-xs text-blue-400">나</span>}
+                    </span>
+                    <span className={`w-16 text-right text-xs ${p.lastWeekPoints > 0 ? "text-green-600 font-semibold" : "text-gray-300"}`}>
+                      {p.lastWeekPoints > 0 ? `+${p.lastWeekPoints}` : "-"}
+                    </span>
+                    <span className="w-16 text-right text-sm font-semibold text-gray-700">
+                      {p.points.toLocaleString()}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* 내 순위가 5위 밖일 때 */}
+              {!myInTopFive && myScore && myRank > 0 && (
+                <>
+                  <div className="px-4 py-1 flex items-center">
+                    <span className="text-xs text-gray-300">···</span>
+                  </div>
+                  <div className="px-4 py-2.5 flex items-center text-sm bg-blue-50 border-t border-blue-100">
+                    <span className="w-6 text-center text-sm text-gray-500">{myRank}</span>
+                    <span className="flex-1 pl-2 font-medium text-blue-700">
+                      {myScore.nickname}
+                      <span className="ml-1 text-xs text-blue-400">나</span>
+                    </span>
+                    <span className={`w-16 text-right text-xs ${myScore.lastWeekPoints > 0 ? "text-green-600 font-semibold" : "text-gray-300"}`}>
+                      {myScore.lastWeekPoints > 0 ? `+${myScore.lastWeekPoints}` : "-"}
+                    </span>
+                    <span className="w-16 text-right text-sm font-semibold text-gray-700">
+                      {myScore.points.toLocaleString()}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </section>

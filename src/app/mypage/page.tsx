@@ -137,7 +137,7 @@ export default function MyPage() {
           user_id: p.user_id,
           nickname: p.nickname,
           points: p.points,
-          lastWeekPoints: lastWeekMap[p.id] ?? 0,
+          lastWeekPoints: lastWeekMap[p.user_id] ?? 0,
         }))
       );
     }

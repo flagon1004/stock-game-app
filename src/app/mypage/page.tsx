@@ -133,8 +133,8 @@ export default function MyPage() {
       }
 
       setPlayerScores(
-        profiles.map((p) => ({
-          user_id: p.id,
+        (profiles as { user_id: string; nickname: string; points: number }[]).map((p) => ({
+          user_id: p.user_id,
           nickname: p.nickname,
           points: p.points,
           lastWeekPoints: lastWeekMap[p.id] ?? 0,

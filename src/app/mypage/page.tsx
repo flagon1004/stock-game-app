@@ -92,11 +92,9 @@ export default function MyPage() {
     }
 
     async function loadPlayerScores() {
-      // 전체 회원 누적 점수
+      // 전체 회원 누적 점수 (RLS 우회 함수)
       const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, nickname, points")
-        .order("points", { ascending: false });
+        .rpc("get_leaderboard");
 
       if (!profiles) return;
 

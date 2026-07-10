@@ -26,7 +26,7 @@ interface PickCount {
 const EMPTY_STOCKS = Array.from({ length: 5 }, (_, i) => ({
   stock_code: "",
   stock_name: "",
-  analysis_url: "",
+  analysis_url: `https://flagon1004.github.io/stock-list/stock-${i + 1}.html`,
   sort_order: i + 1,
 }));
 

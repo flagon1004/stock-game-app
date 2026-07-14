@@ -250,7 +250,7 @@ export default function MyPage() {
                 <p className="text-sm font-medium text-gray-700">
                   {currentRound.start_date} ~ {currentRound.end_date}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">전일 종가 기준의 현재 등락률</p>
+                <p className="text-xs text-gray-400 mt-0.5">지난주 종가 기준 금일 종가의 등락률</p>
               </div>
 
               <div className="px-4 py-3 space-y-2">

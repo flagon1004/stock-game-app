@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/generate-stock-info?secret=CRON_SECRET_PLACEHOLDER",
-      "schedule": "10 6 * * 1-5"
-    }
-  ]
-}

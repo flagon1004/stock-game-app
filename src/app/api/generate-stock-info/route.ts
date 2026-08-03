@@ -111,17 +111,23 @@ export async function GET(req: Request) {
   const codes = await fetchSheet("'게임종목'!B5:B9");
   const names = await fetchSheet("'게임종목'!D5:D9");
 
-  const results: string[] = [];
+  const results: { file: string; status: string; error?: string }[] = [];
 
-  await Promise.all(
-    codes.map(async (code, idx) => {
-      const name = names[idx] ?? code;
+  // 순차 처리 (병렬 시 GitHub API 충돌 방지)
+  for (let idx = 0; idx < codes.length; idx++) {
+    const code = codes[idx];
+    const name = names[idx] ?? code;
+    const filename = `stock-1${idx + 1}.html`;
+
+    try {
       const disclosures = await fetchDart(code);
       const html = buildHtml(code, name, disclosures);
-      await uploadToGithub(`stock-1${idx + 1}.html`, html);
-      results.push(`stock-1${idx + 1}.html (${name})`);
-    })
-  );
+      await uploadToGithub(filename, html);
+      results.push({ file: filename, status: "ok" });
+    } catch (err) {
+      results.push({ file: filename, status: "error", error: String(err) });
+    }
+  }
 
-  return NextResponse.json({ ok: true, generated: results });
+  return NextResponse.json({ ok: true, codes, names, results });
 }

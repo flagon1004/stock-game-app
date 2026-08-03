@@ -241,7 +241,7 @@ export default function GamePage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold text-gray-900">{stock.stock_name}</p>
                           {stock.analysis_url && (
                             <a
@@ -254,6 +254,15 @@ export default function GamePage() {
                               분석 보기
                             </a>
                           )}
+                          <a
+                            href={`https://flagon1004.github.io/stock-list/stock-1${stock.sort_order}.html`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full hover:bg-green-200 transition-colors"
+                          >
+                            종목 정보
+                          </a>
                         </div>
                         <p className="text-xs text-gray-400 mt-0.5">{stock.stock_code}</p>
                       </div>

@@ -1,4 +1,4 @@
-const SHEET_RANGE = "'게임종목'!B5:P9";
+const SHEET_RANGE = "'게임종목'!B4:I8";
 
 function parseRate(raw: string): number | null {
   const cleaned = raw.replace(/[%,+\s]/g, "");
@@ -32,7 +32,7 @@ export async function fetchCurrentRates(): Promise<Record<string, number>> {
 
   for (const row of data.values ?? []) {
     const stockCode = row[0]?.trim();
-    const rate = parseRate(row[14] ?? ""); // B열 기준 P열은 14번째 오프셋
+      const rate = parseRate(row[7] ?? ""); // B열 기준 I열은 7번째 오프셋
     if (stockCode && rate !== null) {
       rates[stockCode] = rate;
     }
